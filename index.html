@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accounts FMS 2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* bg-gray-100 */
+            margin: 0; 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh; 
+        }
+        /* Entrance Animation Styles */
+        #entranceAnimationOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.2); 
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px); /* For Safari */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999; 
+            opacity: 1;
+            transition: opacity 0.5s ease-out;
+        }
+        #entranceAnimationOverlay.hidden {
+            opacity: 0;
+            pointer-events: none; 
+        }
+        /* CSS Spinner */
+        .spinner {
+            width: 60px; 
+            height: 60px;
+            border: 6px solid rgba(79, 70, 229, 0.3); 
+            border-top-color: #4f46e5; 
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-text {
+            margin-top: 1.5rem; 
+            font-size: 1.25rem; 
+            font-weight: 600; 
+            color: #374151; 
+            animation: fadeInOut 2s infinite ease-in-out;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        /* Modal Popup Animation */
+        @keyframes modalPopup {
+            0% {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            60% { /* Overshoot point */
+                transform: scale(1.05);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        .modal-content.modal-popup-active { 
+            animation: modalPopup 0.4s ease-out forwards;
+        }
+
+
+        .modal {
+            display: none; position: fixed; z-index: 1000; 
+            left: 0; top: 0; width: 100%; height: 100%; 
+            overflow: auto; background-color: rgba(0,0,0,0.5); 
+        }
+        .modal-content-wrapper {
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100%; padding: 0.5rem; /* Reduced padding for smaller screens */
+        }
+        .modal-content {
+            background-color: #ffffff; margin: auto; padding: 1rem; /* Default padding for small screens */
+            border: 1px solid #d1d5db; width: 95%; /* More responsive width */
+            max-width: 500px; /* Default max-width for mobile */
+            border-radius: 0.5rem; 
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+            position: relative; 
+            transform: scale(1); 
+            opacity: 1;
+            max-height: 90vh; /* Ensure modal height is constrained */
+            overflow-y: auto; /* Allow content scrolling if needed */
+        }
+        /* Larger screens get more padding and wider max-width */
+        @media (min-width: 640px) { /* sm breakpoint */
+            .modal-content {
+                padding: 1.5rem; /* p-6 */
+                max-width: 600px; /* sm:max-w-xl */
+            }
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+             .modal-content {
+                padding: 25px; /* Original padding */
+                max-width: 700px; /* md:max-w-2xl */
+            }
+             #addEntrySectionModal .modal-content, 
+             #entryDetailsModal .modal-content,
+             #howToUseModal .modal-content,
+             #doerInfoModal .modal-content { 
+                max-width: 850px; 
+            }
+        }
+
+
+        #addEntrySectionModal .modal-content { 
+             padding: 5px; 
+        }
+        #googleFormIframe {
+            width: 100%;
+            height: calc(85vh - 70px); /* Adjust height considering modal padding and title */
+            border: none;
+        }
+
+        #messageAlertModal .modal-content { 
+            max-width: 450px; 
+            padding: 1.5rem; /* Consistent padding */
+        }
+
+        .close-button { 
+            color: #6b7280; position: absolute; top: 0.5rem; right: 0.75rem; /* Adjusted for smaller padding */
+            font-size: 1.875rem; /* text-3xl */ font-weight: bold; transition: color 0.2s;
+            line-height: 1; 
+            z-index: 10; 
+            padding: 0.25rem; /* Make it easier to tap */
+        }
+         @media (min-width: 640px) {
+            .close-button {
+                top: 10px; right: 15px; /* Restore original for larger screens */
+            }
+        }
+
+        .modal-controls-group { 
+            position: absolute;
+            top: 0.5rem; right: 0.75rem; /* Adjusted for smaller padding */
+            display: flex;
+            align-items: center;
+            gap: 0.25rem; /* Reduced gap */
+            z-index: 10; 
+        }
+        @media (min-width: 640px) {
+            .modal-controls-group {
+                top: 12px; right: 15px; /* Restore original for larger screens */
+                gap: 6px;
+            }
+        }
+
+        .modal-control-button {
+            background: none;
+            border: none;
+            padding: 0.5rem; /* Increased padding for touch target */
+            cursor: pointer;
+            line-height: 1;
+            display: flex; 
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.25rem; 
+            transition: background-color 0.2s;
+        }
+        .modal-control-button svg {
+            width: 1rem; /* 16px */ 
+            height: 1rem;
+            display: block; 
+        }
+        .modal-control-button.delete-btn svg { fill: #9ca3af; }
+        .modal-control-button.delete-btn:hover svg { fill: #dc2626; }
+        .modal-control-button.close-btn svg { fill: #9ca3af; }
+        .modal-control-button.close-btn:hover svg { fill: #374151; }
+         .modal-control-button.close-lost-btn svg { fill: #9ca3af; } 
+        .modal-control-button.close-lost-btn:hover svg { fill: #f97316; } 
+        .modal-control-button:hover { background-color: #e5e7eb; }
+
+        .table-container::-webkit-scrollbar { width: 8px; height: 8px; }
+        .table-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        .table-container::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+        .table-container::-webkit-scrollbar-thumb:hover { background: #555; }
+        .btn {
+            padding: 0.625rem 1.25rem; /* Slightly reduced padding for mobile, can adjust further */
+            border-radius: 0.375rem; font-weight: 500; 
+            transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, transform 0.1s ease;
+            cursor: pointer; text-align: center; display: inline-flex; 
+            align-items: center; justify-content: center;
+            min-height: 44px; /* Touch target */
+        }
+        @media (min-width: 640px) {
+            .btn {
+                padding: 0.75rem 1.5rem; /* Restore original for larger screens */
+            }
+        }
+        .btn svg { margin-right: 0.5rem; margin-left: -0.25rem; }
+        .btn-icon-only svg { margin-right: 0; margin-left: 0; } 
+        .btn:active { transform: translateY(1px); }
+        .btn-primary { background-color: #4f46e5; color: white; }
+        .btn-primary:hover { background-color: #4338ca; box-shadow: 0 4px 14px 0 rgba(79,70,229,0.39); }
+        .btn-secondary { background-color: #e5e7eb; color: #374151; }
+        .btn-secondary:hover { background-color: #d1d5db; }
+        .btn-success { background-color: #10b981; color: white; } 
+        .btn-success:hover { background-color: #059669; }
+        .btn-warning { background-color: #f59e0b; color: white; } 
+        .btn-warning:hover { background-color: #d97706; }
+        .btn-info { background-color: #3b82f6; color: white; } 
+        .btn-info:hover { background-color: #2563eb; }
+        .btn-danger { background-color: #dc2626; color: white; }
+        .btn-danger:hover { background-color: #b91c1c; }
+        
+        .form-grid { display: grid; grid-template-columns: repeat(1, 1fr); gap: 1rem; }
+        @media (min-width: 768px) { 
+            .form-grid { grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
+            .form-grid .col-span-2 { grid-column: span 2 / span 2; }
+        }
+        
+        .delay-ontime { color: #10b981; font-weight: 500; }
+        .delay-late { color: #dc2626; font-weight: 500; }
+        .delay-early { color: #3b82f6; font-weight: 500; }
+        .overdue-task { color: #dc2626; font-weight: bold; } 
+
+        #entryDetailsModal .crm-card { background: #fff; }
+        #entryDetailsModal .crm-card h2 { margin-bottom: 1rem; font-size: 1.125rem; sm:font-size: 1.25rem; color: #2c3e50; font-weight: 600; }
+        #entryDetailsModal .crm-section-row { display: flex; flex-direction: column; sm:flex-row; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
+        #entryDetailsModal .crm-section { flex: 1 1 100%; sm:flex: 1 1 300px; border-radius: 8px; border: 1px solid #e0e0e0; background-color: var(--section-bg, rgba(200,200,200,0.1)); font-size: 0.8rem; sm:font-size: 13px; min-width: 280px; }
+        #entryDetailsModal .crm-section-header { padding: 0.5rem 0.75rem; sm:padding: 8px 12px; font-weight: 700; font-size: 0.875rem; sm:font-size: 14px; display: flex; align-items: center; gap: 0.5rem; sm:gap: 8px; color: white; background-color: var(--section-color, #777); border-top-left-radius: 7px; border-top-right-radius: 7px;}
+        #entryDetailsModal .crm-section-header svg { width: 0.875rem; height: 0.875rem; sm:width: 16px; sm:height: 16px; fill: white;}
+        #entryDetailsModal .crm-section-content { padding: 0.625rem 0.75rem; sm:padding: 10px 12px; border-bottom-left-radius: 7px; border-bottom-right-radius: 7px;}
+        #entryDetailsModal .crm-description-item { margin-bottom: 0.5rem; }
+        #entryDetailsModal .crm-description-item:last-child { margin-bottom: 0; }
+        #entryDetailsModal .crm-label { font-weight: 600; color: #555; font-size: 0.75rem; sm:font-size: 0.8rem; margin-bottom: 2px;}
+        #entryDetailsModal .crm-value { font-size: 0.8rem; sm:font-size: 0.9rem; color: #222; word-break: break-word;}
+        #entryDetailsModal .crm-status-banner { background-color: #fff3cd; color: #856404; padding: 0.625rem 0.75rem; sm:padding: 10px 12px; border-radius: 8px; font-weight: 700; text-align: center; margin-top: 1.25rem; font-size: 0.875rem; sm:font-size: 14px;}
+
+        .details-section { background-color: #f9fafb; padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 1.25rem; border: 1px solid #e5e7eb;}
+        .details-section h3 { font-size: 1rem; sm:font-size: 1.125rem; font-weight: 600; color: #4f46e5; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px solid #6366f1; }
+        .timeline-step { padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 0.375rem; margin-bottom: 0.75rem; background-color: #fff;}
+        .timeline-step strong { color: #4338ca; font-size: 0.9rem; sm:font-size: 1rem; display: block; margin-bottom: 0.25rem;}
+        .timeline-details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); sm:grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem;}
+        .timeline-details-grid .details-item { padding: 0.1rem 0; margin-bottom: 0.1rem;}
+        .timeline-details-grid .details-label { font-size: 0.75rem; sm:font-size: 0.8rem; }
+        .timeline-details-grid .details-value { font-size: 0.8rem; sm:font-size: 0.85rem; }
+        .timeline-step .btn-take-action { margin-top: 0.75rem; padding: 0.375rem 0.75rem; font-size: 0.875rem; }
+
+        .sortable-header { cursor: pointer; position: relative; padding-right: 1.25rem; } /* 20px */
+        .sortable-header::after { content: ''; position: absolute; right: 0.3125rem; /* 5px */ top: 50%; transform: translateY(-50%); font-size: 0.8em; opacity: 0.5;}
+        .sortable-header.sort-asc::after { content: '▲'; opacity: 1; }
+        .sortable-header.sort-desc::after { content: '▼'; opacity: 1; }
+
+        .scorecard-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); sm:grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.5rem; sm:gap: 1rem; margin-bottom: 1.5rem; sm:margin-bottom: 2rem;}
+        .scorecard { background-color: white; padding: 1rem; sm:padding: 1.25rem; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); text-align: center;}
+        .scorecard-title { font-size: 0.75rem; sm:font-size: 0.875rem; color: #6b7280; margin-bottom: 0.25rem; sm:margin-bottom: 0.5rem; font-weight: 500; }
+        .scorecard-value { font-size: 1.875rem; sm:font-size: 2.25rem; font-weight: 700; color: #1f2937; }
+        /* Scorecard specific colors - will need adjustment for new statuses */
+        .scorecard.total-entries .scorecard-value { color: #4f46e5; }
+        .scorecard.pending-s1 .scorecard-value { color: #f59e0b; }
+        .scorecard.pending-s2 .scorecard-value { color: #84cc16; }
+        .scorecard.approved .scorecard-value { color: #10b981; }
+        .scorecard.rejected .scorecard-value { color: #ef4444; }
+
+
+        /* Status Badge Styles for Accounts FMS 2.0 */
+        .status-badge {
+            padding: 0.25em 0.6em;
+            border-radius: 0.25rem; 
+            font-size: 0.7rem; /* Slightly smaller for mobile */
+            sm:font-size: 0.75rem; 
+            font-weight: 500; 
+            text-align: center;
+            display: inline-block;
+            min-width: 100px; /* Adjusted min-width */
+            sm:min-width: 120px; 
+            color: white; 
+        }
+        .status-pending-s1-action { background-color: #fbbf24; color: #78350f; } 
+        .status-s1-done-awaiting-s2-action { background-color: #a3e635; color: #3f6212; } 
+        .status-s2-action-taken-awaiting-approval { background-color: #60a5fa; color: #1e3a8a; } 
+        .status-s2-approved { background-color: #34d399; color: #065f46; } 
+        .status-s2-rejected { background-color: #f87171; color: #991b1b; } 
+        .status-default { background-color: #9ca3af; color: white; } 
+        
+
+        /* Class for rotating sync icon */
+        .rotate-animate {
+            animation: rotateIcon 1s linear;
+        }
+        @keyframes rotateIcon {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        .main-content-area {
+            flex-grow: 1; 
+            padding: 0.75rem; /* p-3 for mobile */
+        }
+         @media (min-width: 640px) { /* sm */
+            .main-content-area {
+                padding: 1.5rem; /* p-6 */
+            }
+        }
+        @media (min-width: 768px) { /* md */
+            .main-content-area {
+                padding: 2rem; /* p-8 */
+            }
+        }
+
+
+        @media screen and (max-width: 768px) {
+            .responsive-table thead { display: none; }
+            .responsive-table tr { display: block; margin-bottom: 0.625em; border-radius: 0.375rem; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06); border: 1px solid #e5e7eb;}
+            .responsive-table td { 
+                display: block; text-align: right; font-size: 0.8rem; /* Slightly smaller font for mobile table cells */
+                border-bottom: 1px solid #e5e7eb; padding: 0.5rem 0.75rem !important; /* Reduced padding */
+                padding-left: 45% !important; /* Ensure space for label */
+                position: relative;
+            }
+            .responsive-table td::before { 
+                content: attr(data-label); position: absolute; left: 0.5rem; /* Reduced left padding */
+                width: 40%; /* Adjusted width */
+                padding-right: 0.5rem; /* Reduced padding */
+                white-space: nowrap; text-align: left; font-weight: 600; color: #4b5563; 
+            }
+            .responsive-table td:last-child { border-bottom: 0; }
+            .responsive-table.doer-info-table td { padding-left: 30% !important; } 
+            .responsive-table.doer-info-table td::before { width: 25%; } 
+            .main-action-buttons button { width: 100%; margin-bottom: 0.5rem;} 
+        }
+    </style>
+</head>
+<body class="bg-gray-100"> 
+
+    <div id="entranceAnimationOverlay">
+        <div class="spinner"></div> 
+        <p class="loading-text">Loading Accounts FMS 2.0...</p> 
+    </div>
+
+    <header class="sticky top-0 z-50 bg-white shadow-md">
+        <div class="container mx-auto px-2 sm:px-4 lg:px-8"> <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h7.5M12 15.75h.008v.008H12v-.008z" />
+                        </svg>
+                    </div>
+                    <div class="ml-2 sm:ml-3">
+                        <p class="text-md sm:text-lg font-bold text-gray-800">Accounts FMS 2.0</p> 
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2 sm:space-x-4">
+                    <div class="hidden sm:block">
+                        <p id="dateTimeDisplay" class="text-xs text-gray-500"></p>
+                    </div>
+
+                    <button id="syncButton" type="button" title="Sync Data" class="p-1.5 rounded-full text-gray-500 hover:bg-gray-200 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                        <span class="sr-only">Sync Data</span>
+                        <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                    </button>
+
+                    <button type="button" title="User Profile" class="p-1.5 rounded-full text-gray-500 hover:bg-gray-200 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                        <span class="sr-only">Open user menu</span>
+                        <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-content-area container mx-auto max-w-7xl bg-white rounded-lg shadow-xl mt-4"> 
+        <div class="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:flex-wrap justify-end gap-2 main-action-buttons"> 
+            <button id="openDoerInfoModalButton" class="btn btn-secondary text-sm w-full sm:w-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-people-fill" viewBox="0 0 16 16">
+                    <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/>
+                </svg>
+                Responsibilities
+            </button>
+            <button id="openBackendDataButton" class="btn btn-secondary text-sm w-full sm:w-auto"> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-database-fill-gear" viewBox="0 0 16 16">
+                    <path d="M8 1c-1.573 0-3.022.289-4.096.777C2.875 2.245 2 2.993 2 4s.875 1.755 1.904 2.223C4.978 6.711 6.427 7 8 7s3.022-.289 4.096-.777C13.125 5.755 14 5.007 14 4s-.875-1.755-1.904-2.223C11.022 1.289 9.573 1 8 1"/>
+                    <path d="M2 7v-.839c.457.432 1.004.751 1.49.972C4.722 7.693 6.318 8 8 8s3.278-.307 4.51-.867c.486-.22 1.033-.54 1.49-.972V7c0 .021-.001.043-.003.064C13.486 7.153 12.006 7.5 8 7.5s-5.486-.347-6.997-.436A1.02 1.02 0 0 1 2 7m-1 7v-1c0-.021.001-.043.003-.064C1.514 12.847 2.994 12.5 6 12.5s4.486.347 5.997.436c.002.02.003.043.003.064v1a1.02 1.02 0 0 1-.003.064C11.486 13.153 10.006 13.5 7 13.5s-4.486-.347-5.997-.436A1.02 1.02 0 0 1 1 14m10.887-1.754C10.51 12.089 9.36 12 8 12s-2.51.089-3.887.246a.5.5 0 0 0-.113.034V10.5a.5.5 0 0 1 .113-.034C5.49 10.32 6.64 10.25 8 10.25s2.51.07 3.887.216a.5.5 0 0 1 .113.034v1.716a.5.5 0 0 0-.113-.034M15.777 11.1l-.82-.072A1.8 1.8 0 0 0 14.19 11H14v-.11c0-.081-.001-.16-.004-.238c-.103-.64-.393-1.22-.788-1.73A2.99 2.99 0 0 0 11.437 8c-.152.243-.29.505-.412.786A2.99 2.99 0 0 0 12.563 8c.152.243.29.505.412.786a2.99 2.99 0 0 0 1.025.974c.003.078.004.157.004.238V11h-.191c-.391-.03-.755-.166-1.058-.28A1.8 1.8 0 0 0 11.4 11.1l-.82.072a.5.5 0 1 0 .036.993l.82-.072c.14-.012.274-.003.393.047a.5.5 0 0 0 .253.286l.708.404a.5.5 0 0 0 .596-.044l.708-.404a.5.5 0 0 0 .253-.286c.118-.05.253-.059.393-.047l.82.072a.5.5 0 1 0 .036-.993zM8 16a1 1 0 1 0 0-2 1 1 0 0 0 0 2"/>
+                </svg>
+                Backend Data
+            </button>
+            <button id="openHowToUseModalButton" class="btn btn-secondary text-sm w-full sm:w-auto"> 
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-question-circle-fill" viewBox="0 0 16 16">
+                    <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.496 6.033h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286a.237.237 0 0 0 .241.247zm2.325 6.443c-.584 0-1.009-.394-1.009-.927 0-.552.425-.94 1.01-.94.609 0 1.028.388 1.028.94 0 .533-.42.927-1.029.927z"/>
+                </svg>
+                How to Use
+            </button>
+            <button id="openEntryFormModalButton" class="btn btn-primary text-sm w-full sm:w-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-circle-fill" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3z"/></svg>
+                Add Entry
+            </button>
+        </div>
+
+        <section id="scorecardSection" class="mb-6 sm:mb-8">
+            <h2 class="text-xl sm:text-2xl font-semibold text-gray-700 mb-3 sm:mb-4">Overview</h2>
+            <div class="scorecard-container">
+                <div class="scorecard total-entries">
+                    <div class="scorecard-title">Total Entries</div>
+                    <div class="scorecard-value" id="scorecardTotalEntries">0</div>
+                </div>
+                <div class="scorecard pending-s1">
+                    <div class="scorecard-title">Pending: Update Status to MD</div>
+                    <div class="scorecard-value" id="scorecardPendingS1">0</div>
+                </div>
+                <div class="scorecard pending-s2">
+                    <div class="scorecard-title">Pending: Doc Check & Approval</div>
+                    <div class="scorecard-value" id="scorecardPendingS2">0</div>
+                </div>
+                <div class="scorecard approved">
+                    <div class="scorecard-title">Approved: Doc Check</div>
+                    <div class="scorecard-value" id="scorecardS2Approved">0</div>
+                </div>
+                 <div class="scorecard rejected">
+                    <div class="scorecard-title">Rejected: Doc Check</div>
+                    <div class="scorecard-value" id="scorecardS2Rejected">0</div>
+                </div>
+            </div>
+        </section>
+
+
+        <div id="addEntrySectionModal" class="modal"><div class="modal-content-wrapper">
+            <section class="modal-content bg-gray-50">
+                <span id="closeEntryFormModalButton" class="close-button">&times;</span>
+                <h2 class="text-xl sm:text-2xl font-semibold text-gray-700 mb-2 text-center">Add New Account Entry</h2>
+                <p class="text-xs sm:text-sm text-gray-500 text-center mb-3 sm:mb-4">Please submit new entries using the Google Form.</p>
+                <iframe id="googleFormIframe" 
+                        src="https://docs.google.com/forms/d/e/1FAIpQLSfmJlLiNSs_pAf03EM06jBUR6Me0zFQJcDzkcsuEoZ2eU5mnw/viewform?embedded=true" 
+                        frameborder="0" marginheight="0" marginwidth="0">Loading…</iframe>
+            </section>
+        </div></div>
+
+        <div id="doerInfoModal" class="modal"><div class="modal-content-wrapper">
+            <section class="modal-content bg-white">
+                <span id="closeDoerInfoModalButton" class="close-button">&times;</span>
+                <h1 class="text-xl sm:text-2xl font-bold text-indigo-600 mb-4 sm:mb-6">Process Responsibilities</h1>
+                <div class="space-y-4 sm:space-y-6 text-gray-700 text-xs sm:text-sm leading-relaxed">
+                    <div class="bg-gray-50 p-3 sm:p-4 rounded-md shadow">
+                        <h2 class="text-md sm:text-lg font-semibold text-indigo-500 mb-2 flex items-center">
+                            <svg class="h-5 w-5 sm:h-6 sm:w-6 text-blue-500 mr-2 sm:mr-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                            </svg>
+                            Add Entry: Accounts FMS - Payment Details
+                        </h2>
+                        <ul class="list-disc list-inside ml-6 sm:ml-10 space-y-1">
+                            <li><strong>Who:</strong> MD / Accounts Team</li>
+                            <li><strong>How:</strong> Please update the necessary details by clicking the 'Add Entry' button.</li>
+                            <li><strong>When:</strong> Any Time</li>
+                        </ul>
+                    </div>
+                    <div class="bg-gray-50 p-3 sm:p-4 rounded-md shadow">
+                        <h2 class="text-md sm:text-lg font-semibold text-indigo-500 mb-2 flex items-center">
+                            <svg class="h-5 w-5 sm:h-6 sm:w-6 text-purple-500 mr-2 sm:mr-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+                            </svg>
+                            Updating Status to MD and Submitting
+                        </h2>
+                        <ul class="list-disc list-inside ml-6 sm:ml-10 space-y-1">
+                            <li><strong>Who:</strong> Accounts Team</li>
+                            <li><strong>How:</strong> Updating status to MD and submitting by clicking the 'Take Action' button in View Details.</li>
+                            <li><strong>When:</strong> Within Two days</li>
+                        </ul>
+                    </div>
+                    <div class="bg-gray-50 p-3 sm:p-4 rounded-md shadow">
+                        <h2 class="text-md sm:text-lg font-semibold text-indigo-500 mb-2 flex items-center">
+                             <svg class="h-5 w-5 sm:h-6 sm:w-6 text-green-500 mr-2 sm:mr-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            Check Necessary Documents And Approve the same
+                        </h2>
+                        <ul class="list-disc list-inside ml-6 sm:ml-10 space-y-1">
+                            <li><strong>Who:</strong> MD</li>
+                            <li><strong>How:</strong> Review documents and approve or reject via the 'Take Action' button in View Details.</li>
+                            <li><strong>When:</strong> Within Two days</li>
+                        </ul>
+                    </div>
+                </div>
+                 <div class="mt-6 sm:mt-8 text-right">
+                    <button type="button" id="okDoerInfoModalButton" class="btn btn-primary">OK</button>
+                </div>
+            </section>
+        </div></div>
+        
+        <div id="entryDetailsModal" class="modal"><div class="modal-content-wrapper">
+            <section class="modal-content bg-white">
+                <h2 class="text-xl sm:text-2xl font-semibold text-gray-700 mb-1 mt-6 sm:mt-8" id="detailsModalTitle">Entry Details</h2> 
+                <p class="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6" id="detailsModalSubtitle"></p>
+                <div id="detailsModalContent">
+                    </div>
+            </section>
+        </div></div>
+
+        <div id="howToUseModal" class="modal"><div class="modal-content-wrapper">
+            <section class="modal-content bg-white">
+                <span id="closeHowToUseModalButton" class="close-button">&times;</span>
+                <h1 class="text-xl sm:text-2xl font-bold text-indigo-600 mb-4">How to Use Accounts FMS 2.0</h1>
+                <div class="space-y-3 sm:space-y-4 text-gray-700 text-xs sm:text-sm leading-relaxed">
+                    <p>Welcome to the <strong>Accounts FMS 2.0</strong>. This guide outlines how to use the system for managing payment details and processing stages.</p>
+                    <div>
+                        <h2 class="text-md sm:text-lg font-semibold text-indigo-500 mt-2 sm:mt-3 mb-1">1. Adding a New Entry (Payment Details)</h2>
+                        <ul class="list-disc list-inside ml-4 space-y-1">
+                            <li>Click the <strong class="text-indigo-600">"Add Entry"</strong> button. This will open a Google Form in a new tab.</li>
+                            <li>Fill in the Google Form with all necessary payment details (Party Name, Payment Amounts, Mobile, Comments, etc.) and submit it.</li>
+                            <li>The UID and Timestamp are typically auto-generated or managed by the form/sheet.</li>
+                            <li>New entries will appear in the FMS table after the next data sync (click the 🔄 icon).</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2 class="text-md sm:text-lg font-semibold text-indigo-500 mt-2 sm:mt-3 mb-1">2. Viewing and Managing Entries</h2>
+                        <ul class="list-disc list-inside ml-4 space-y-1">
+                            <li>All recorded entries are listed in the main table.</li>
+                            <li>Use the <strong>search bar</strong> to find specific entries by any field.</li>
+                            <li>Click on table headers (e.g., UID, Timestamp, Party Name) to <strong>sort</strong> the records.</li>
+                            <li>Click the <span class="inline-flex items-center justify-center h-5 w-5 bg-blue-100 text-blue-600 rounded-full align-middle">👁️</span> icon in a row to view <strong>detailed information</strong> for an entry.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2 class="text-md sm:text-lg font-semibold text-indigo-500 mt-2 sm:mt-3 mb-1">3. Processing Entries Through Stages</h2>
+                        <ul class="list-disc list-inside ml-4 space-y-1">
+                            <li>Open <strong>Entry Details</strong> by clicking the 👁️ icon.</li>
+                            <li>The "Process Timeline" section will show the current stage of the entry.</li>
+                            <li><strong>Stage 1 (Updating Status to MD and Submitting by Accounts Team):</strong>
+                                <ul class="list-circle list-inside ml-5 space-y-1">
+                                    <li>If the status is "Pending: Updating Status to MD and Submitting", a button labeled "Take Action" will be available.</li>
+                                    <li>If the "Take Action (S1)" field for the entry contains a URL, clicking the button will open this URL in a new tab for the Accounts Team.</li>
+                                    <li>Otherwise, clicking the button allows internal completion within the FMS.</li>
+                                    <li>After action, the system (potentially after a sync) will update "Actual (S1)" and status to "Pending: Check Necessary Documents And Approve the same".</li>
+                                </ul>
+                            </li>
+                             <li><strong>Stage 2 (Check Necessary Documents And Approve the same by MD):</strong>
+                                <ul class="list-circle list-inside ml-5 space-y-1">
+                                     <li>If status is "Pending: Check Necessary Documents And Approve the same", a button labeled "Take Action" appears. If "Take Action (S2)" for the entry has a URL, the MD uses this external form.</li>
+                                     <li>Once Stage 2 action is noted (internally or externally), the status becomes "Awaiting Approval: Check Necessary Documents And Approve the same".</li>
+                                     <li>At this point, "Take Action" buttons will appear for the MD to check documents and finalize (Approve/Reject).</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2 class="text-md sm:text-lg font-semibold text-indigo-500 mt-2 sm:mt-3 mb-1">4. Task Responsibilities</h2> <ul class="list-disc list-inside ml-4 space-y-1">
+                            <li>Click the <strong>“Responsibilities”</strong> button to view who is assigned to each task/stage.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2 class="text-md sm:text-lg font-semibold text-indigo-500 mt-2 sm:mt-3 mb-1">5. Syncing Data</h2> <ul class="list-disc list-inside ml-4 space-y-1">
+                            <li>Click the <strong>🔄 Sync icon</strong> in the top header to refresh and load the latest data from the Google Sheet.</li>
+                        </ul>
+                    </div>
+
+                    <div class="mt-4 sm:mt-6 p-3 sm:p-4 bg-green-50 border-l-4 border-green-500 text-green-700 rounded-md">
+                        <p class="font-bold">🔧 Note:</p>
+                        <p>This guide is for <strong>Accounts FMS 2.0</strong>. For issues, contact the <strong>Admin/Support</strong>.</p>
+                    </div>
+                </div>
+                <div class="mt-4 sm:mt-6 text-right">
+                    <button type="button" id="okHowToUseModalButton" class="btn btn-primary">OK</button>
+                </div>
+            </section>
+        </div></div>
+
+        <section id="entriesListSection" class="mb-6 sm:mb-10">
+            <h2 class="text-xl sm:text-2xl font-semibold text-gray-700 mb-4 sm:mb-6">All Recorded Entries</h2>
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-3 sm:mb-4 space-y-2 sm:space-y-0">
+                <input type="text" id="searchInput" placeholder="Search entries..." class="p-2 border border-gray-300 rounded-md shadow-sm w-full sm:w-auto text-sm">
+                </div>
+            <div id="tableStatus" class="text-center p-4 text-gray-500">Loading entries...</div>
+            <div class="table-container overflow-x-auto bg-white rounded-lg shadow">
+                <table class="min-w-full divide-y divide-gray-200 responsive-table">
+                    <thead id="entriesTableHead" class="bg-gray-50">
+                        <tr>
+                            </tr>
+                    </thead>
+                    <tbody id="entriesTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                </table>
+            </div>
+             <div id="paginationControls" class="mt-3 sm:mt-4 flex justify-center items-center space-x-1 sm:space-x-2"></div>
+        </section>
+    </div>
+
+    <div id="messageAlertModal" class="modal"><div class="modal-content-wrapper">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeAlertModal()">&times;</span> 
+            <p id="modalMessage" class="text-gray-700 text-center"></p>
+            <div class="mt-6 text-center default-modal-buttons"><button onclick="closeAlertModal()" class="btn btn-primary">OK</button></div>
+            <div class="mt-6 flex justify-center space-x-3 confirm-buttons" style="display:none;"><button id="modalCancelButton" class="btn btn-secondary">Cancel</button><button id="modalConfirmButton" class="btn btn-danger">Confirm</button></div>
+            <div class="mt-6 flex justify-center space-x-3 custom-choice-buttons" style="display:none;">
+                </div>
+        </div>
+    </div></div>
+    
+    <footer class="py-4 sm:py-6 text-center text-xs sm:text-sm text-gray-500">
+        © 2025 Build Wealth Realtors. All rights reserved.
+    </footer>
+
+    <script>
+        // --- CONFIGURATION & GLOBAL VARS ---
+        const VIEW_ENTRIES_URL = 'https://script.google.com/macros/s/AKfycbzjN1DHyHyfLJUx7ttPlx73tfftKpUaKAd3chWpVoLbhG8OJkz796BrRRO7rsuDDZ3W2A/exec'; 
+        const MODIFY_ENTRIES_URL = 'https://sheetdb.io/api/v1/nydthm8eqg4w4'; 
+        const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfmJlLiNSs_pAf03EM06jBUR6Me0zFQJcDzkcsuEoZ2eU5mnw/viewform';
+        
+        const ITEMS_PER_PAGE = 10;
+        let currentPage = 1;
+        let allEntries = [];
+        let nextUidNumber = 1; 
+        let currentSortColumn = 'Timestamp'; 
+        let currentSortDirection = 'desc'; 
+
+        // --- NEW STATUSES FOR ACCOUNTS FMS 2.0 ---
+        const STATUS_S1_PENDING = "Pending: Updating Status to MD and Submitting";
+        const STATUS_S1_COMPLETE = "Pending: Check Necessary Documents And Approve the same";
+        const STATUS_S2_ACTION_TAKEN = "Awaiting Approval: Check Necessary Documents And Approve the same";
+        const STATUS_S2_APPROVED = "Approved: Check Necessary Documents And Approve the same";
+        const STATUS_S2_REJECTED = "Rejected: Check Necessary Documents And Approve the same";
+
+
+        const STATUS_MAP = {
+            S1_PENDING: STATUS_S1_PENDING,
+            S1_COMPLETE: STATUS_S1_COMPLETE,
+            S2_ACTION_TAKEN: STATUS_S2_ACTION_TAKEN,
+            S2_APPROVED: STATUS_S2_APPROVED,
+            S2_REJECTED: STATUS_S2_REJECTED,
+        };
+        
+        const STEP_NAMES = { 
+            s1Action: "Updating Status to MD and Submitting",
+            s2Action: "Check Necessary Documents And Approve the same",
+            s2Approval: "Final MD Approval/Rejection" 
+        };
+
+        const STEP_ACTION_CONFIG = {
+            s1Action: { nextStatus: STATUS_MAP.S1_COMPLETE, buttonText: 'Take Action', plannedKey: 'Planned (S1)', actualKey: 'Actual (S1)', timeDelayKey: 'Time Delay (S1)', commentsKey: 'Comments' },
+            s2Action: { nextStatus: STATUS_MAP.S2_ACTION_TAKEN, buttonText: 'Take Action', plannedKey: 'Planned (S2)', actualKey: 'Actual (S2)', timeDelayKey: 'Time Delay (S2)', commentsKey: 'Comments (S2)' },
+            s2Approve: { nextStatus: STATUS_MAP.S2_APPROVED, buttonText: 'Take Action' }, 
+            s2Reject: { nextStatus: STATUS_MAP.S2_REJECTED, buttonText: 'Take Action' }  
+        };
+        
+        const tableHeadersConfig = [
+            { key: 'UID', label: 'UID', sortable: true },
+            { key: 'Timestamp', label: 'Timestamp', sortable: true, isDate: true },
+            { key: 'Party Name', label: 'Party Name', sortable: true },
+            { key: 'Payment Amounts', label: 'Payment Amt', sortable: true },
+            { key: 'status', label: 'Status', sortable: true }, 
+            { key: 'nextPlannedActionOn', label: 'Next Planned On', sortable: true, isDate: true, customRender: (entry) => getNextPlannedActionTimestamp(entry) }, 
+            { key: 'Comments', label: 'Comments', sortable: false },
+            { key: 'actions', label: 'Actions', sortable: false }
+        ];
+
+
+        // --- DOM ELEMENTS ---
+        const addEntrySectionModal = document.getElementById('addEntrySectionModal');
+        const openEntryFormModalButton = document.getElementById('openEntryFormModalButton');
+        const closeEntryFormModalButton = document.getElementById('closeEntryFormModalButton');
+
+        const doerInfoModal = document.getElementById('doerInfoModal');
+        const openDoerInfoModalButton = document.getElementById('openDoerInfoModalButton');
+        const closeDoerInfoModalButton = document.getElementById('closeDoerInfoModalButton');
+        const okDoerInfoModalButton = document.getElementById('okDoerInfoModalButton'); 
+        
+        const howToUseModal = document.getElementById('howToUseModal'); 
+        const openHowToUseModalButton = document.getElementById('openHowToUseModalButton'); 
+        const closeHowToUseModalButton = document.getElementById('closeHowToUseModalButton'); 
+        const okHowToUseModalButton = document.getElementById('okHowToUseModalButton'); 
+        
+
+        const entryDetailsModal = document.getElementById('entryDetailsModal'); 
+        const detailsModalTitle = document.getElementById('detailsModalTitle');
+        const detailsModalSubtitle = document.getElementById('detailsModalSubtitle'); 
+        const detailsModalContent = document.getElementById('detailsModalContent');
+
+        const messageAlertModal = document.getElementById('messageAlertModal');
+        const modalMessage = document.getElementById('modalMessage');
+        const defaultModalButtons = messageAlertModal.querySelector('.default-modal-buttons');
+        const confirmModalButtons = messageAlertModal.querySelector('.confirm-buttons');
+        const modalConfirmButton = document.getElementById('modalConfirmButton');
+        const modalCancelButton = document.getElementById('modalCancelButton');
+        const customChoiceButtonsContainer = messageAlertModal.querySelector('.custom-choice-buttons');
+
+
+        const entriesTableHead = document.getElementById('entriesTableHead'); 
+        const entriesTableBody = document.getElementById('entriesTableBody');
+        const tableStatus = document.getElementById('tableStatus');
+        const searchInput = document.getElementById('searchInput');
+        const paginationControls = document.getElementById('paginationControls');
+
+        const scorecardTotalEntries = document.getElementById('scorecardTotalEntries');
+        const scorecardPendingS1 = document.getElementById('scorecardPendingS1');
+        const scorecardPendingS2 = document.getElementById('scorecardPendingS2');
+        const scorecardS2Approved = document.getElementById('scorecardS2Approved');
+        const scorecardS2Rejected = document.getElementById('scorecardS2Rejected');
+        const entranceAnimationOverlay = document.getElementById('entranceAnimationOverlay');
+
+
+        // --- MODAL CONTROL FUNCTIONS ---
+        function openModal(modalElement) {
+            const modalContent = modalElement.querySelector('.modal-content');
+            if (modalContent) {
+                modalContent.classList.remove('modal-popup-active');
+                void modalContent.offsetWidth; 
+                modalContent.classList.add('modal-popup-active');
+            }
+            modalElement.style.display = "block";
+        }
+        function closeModal(modalElement) { 
+            const modalContent = modalElement.querySelector('.modal-content');
+            if (modalContent) {
+                 // modalContent.classList.remove('modal-popup-active'); 
+            }
+            modalElement.style.display = "none"; 
+        }
+
+        function openDoerModal() { openModal(doerInfoModal); }
+        function openHowToUse() { openModal(howToUseModal); } 
+        
+        function openEntryDetailsModal(entryId) {
+            const entry = allEntries.find(e => e.UID === entryId); 
+            if (!entry) {
+                showUserAlert("Error: Could not find entry details for UID: " + entryId, "error");
+                return;
+            }
+            detailsModalTitle.textContent = `Entry Details - ${entry.UID}`; 
+            detailsModalSubtitle.textContent = `Current Status: ${entry.status || determineEntryStatus(entry)}`; 
+            populateDetailsModal(entry); 
+            openModal(entryDetailsModal);
+        }
+
+        function showUserAlert(message, type = 'info', onConfirm = null, customButtons = null) {
+            modalMessage.textContent = message;
+            openModal(messageAlertModal); 
+
+            defaultModalButtons.style.display = 'none';
+            confirmModalButtons.style.display = 'none';
+            customChoiceButtonsContainer.style.display = 'none';
+            customChoiceButtonsContainer.innerHTML = ''; 
+
+            if (type === 'confirm' && onConfirm) {
+                confirmModalButtons.style.display = 'flex';
+                modalConfirmButton.textContent = 'Confirm'; 
+                modalConfirmButton.onclick = () => { onConfirm(); }; 
+                modalCancelButton.onclick = closeAlertModal;
+            } else if (type === 'choice' && customButtons) {
+                customChoiceButtonsContainer.style.display = 'flex';
+                customButtons.forEach(btnConfig => {
+                    const button = document.createElement('button');
+                    button.textContent = btnConfig.text;
+                    button.className = `btn ${btnConfig.class || 'btn-secondary'} ml-2`; 
+                    button.onclick = () => {
+                        closeAlertModal(); 
+                        btnConfig.handler();
+                    };
+                    customChoiceButtonsContainer.appendChild(button);
+                });
+                const cancelBtnChoice = document.createElement('button');
+                cancelBtnChoice.textContent = "Cancel";
+                cancelBtnChoice.className = "btn btn-secondary ml-2";
+                cancelBtnChoice.onclick = closeAlertModal;
+                customChoiceButtonsContainer.insertBefore(cancelBtnChoice, customChoiceButtonsContainer.firstChild);
+
+
+            } else { 
+                defaultModalButtons.style.display = 'block';
+            }
+            
+            modalMessage.classList.remove('text-green-600', 'text-red-600');
+            if (type === 'success') modalMessage.classList.add('text-green-600');
+            if (type === 'error') modalMessage.classList.add('text-red-600');
+        }
+        function closeAlertModal() { closeModal(messageAlertModal); }
+        
+        window.onclick = (event) => { 
+            const modals = [addEntrySectionModal, doerInfoModal, entryDetailsModal, messageAlertModal, howToUseModal]; 
+            modals.forEach(modal => { if (event.target == modal) closeModal(modal); });
+        }
+        
+        // --- UTILITY FUNCTIONS ---
+        function setButtonLoading(isLoading, button, spinner) { 
+            if (!button) return;
+            button.disabled = isLoading; button.classList.toggle('opacity-50', isLoading);
+            if (spinner) spinner.classList.toggle('hidden', !isLoading);
+        }
+
+        function formatDateForDisplay(dateTimeStringOrObject) {
+            if (!dateTimeStringOrObject || dateTimeStringOrObject === 'N/A') return 'N/A';
+            let date;
+            if (dateTimeStringOrObject instanceof Date) {
+                date = dateTimeStringOrObject;
+            } else {
+                const customFormatRegex = /^(\d{2})-([A-Za-z]{3})-(\d{4}) (\d{2}):(\d{2}):(\d{2}) (AM|PM)$/;
+                const match = typeof dateTimeStringOrObject === 'string' ? dateTimeStringOrObject.match(customFormatRegex) : null;
+                if (match) {
+                    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+                    let hours = parseInt(match[4], 10);
+                    if (match[7] === 'PM' && hours < 12) hours += 12;
+                    if (match[7] === 'AM' && hours === 12) hours = 0; 
+                    date = new Date(match[3], months[match[2]], match[1], hours, match[5], match[6]);
+                } else {
+                    date = new Date(dateTimeStringOrObject); 
+                }
+            }
+
+            if (isNaN(date.getTime())) {
+                return dateTimeStringOrObject.toString(); 
+            }
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const day = String(date.getDate()).padStart(2, '0');
+            const monthName = months[date.getMonth()];
+            const year = date.getFullYear();
+            let hours = date.getHours();
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; 
+            const strHours = String(hours).padStart(2, '0');
+            return `${day}-${monthName}-${year} ${strHours}:${minutes}:${seconds} ${ampm}`;
+        }
+
+         function formatDateForInput(date) { 
+            if (!(date instanceof Date) || isNaN(date.getTime())) {
+                date = new Date(); 
+            }
+            const offset = date.getTimezoneOffset();
+            const adjustedDate = new Date(date.getTime() - (offset*60*1000));
+            return adjustedDate.toISOString().slice(0,16); 
+        }
+        function addDays(dateInput, days) { 
+            const result = new Date(dateInput); 
+            result.setDate(result.getDate() + days);
+            return result;
+        }
+        function calculateTimeDelay(actualTimestamp, plannedTimestamp) {
+            if (!actualTimestamp || !plannedTimestamp || actualTimestamp === "N/A" || plannedTimestamp === "N/A" || actualTimestamp === "SKIPPED" || plannedTimestamp === "SKIPPED") return "<span class='text-gray-400'>N/A</span>";
+            
+            const parseCustomDateString = (dateStr) => {
+                if (!dateStr || typeof dateStr !== 'string') return null;
+                const parts = dateStr.match(/(\d{2})-([A-Za-z]{3})-(\d{4}) (\d{2}):(\d{2}):(\d{2}) (AM|PM)/);
+                if (!parts) return new Date(dateStr); 
+                const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+                let hours = parseInt(parts[4], 10);
+                if (parts[7] === 'PM' && hours < 12) hours += 12;
+                if (parts[7] === 'AM' && hours === 12) hours = 0; 
+                return new Date(parts[3], months[parts[2]], parts[1], hours, parts[5], parts[6]);
+            };
+
+            const actual = (actualTimestamp instanceof Date) ? actualTimestamp : parseCustomDateString(actualTimestamp);
+            const planned = (plannedTimestamp instanceof Date) ? plannedTimestamp : parseCustomDateString(plannedTimestamp);
+
+            if (!actual || isNaN(actual.getTime()) || !planned || isNaN(planned.getTime())) {
+                 return "<span class='text-gray-400'>Invalid Date</span>";
+            }
+
+            const diff = actual.getTime() - planned.getTime();
+            const d = Math.floor(diff/(1000*60*60*24)), h = Math.floor((diff%(1000*60*60*24))/(1000*60*60)), m = Math.floor((diff%(1000*60*60))/(1000*60));
+            let delayClass = 'delay-ontime'; let delayText = "On Time";
+            if (diff > 0) { 
+                delayClass = 'delay-late';
+                if (d > 0) delayText = `${d}d late`; else if (h > 0) delayText = `${h}h late`; else if (m > 0) delayText = `${m}m late`; else delayText = "Delayed";
+            } else if (diff < 0) { 
+                 delayClass = 'delay-early';
+                 if (Math.abs(d) > 0) delayText = `${Math.abs(d)}d early`; else if (Math.abs(h) > 0) delayText = `${Math.abs(h)}h early`; else delayText = "Early";
+            }
+            return `<span class="${delayClass}">${delayText}</span>`;
+        }
+        
+        // --- SCORECARD FUNCTIONS ---
+        function renderScorecards(entries) {
+            scorecardTotalEntries.textContent = entries.length;
+            scorecardPendingS1.textContent = entries.filter(e => determineEntryStatus(e) === STATUS_MAP.S1_PENDING).length;
+            scorecardPendingS2.textContent = entries.filter(e => determineEntryStatus(e) === STATUS_MAP.S1_COMPLETE).length; 
+            scorecardS2Approved.textContent = entries.filter(e => determineEntryStatus(e) === STATUS_MAP.S2_APPROVED).length;
+            scorecardS2Rejected.textContent = entries.filter(e => determineEntryStatus(e) === STATUS_MAP.S2_REJECTED).length;
+        }
+
+        // --- TABLE SORTING FUNCTIONS ---
+        function initializeTableHeaders() {
+            const headerRow = entriesTableHead.querySelector('tr') || entriesTableHead.appendChild(document.createElement('tr'));
+            headerRow.innerHTML = ''; 
+
+            tableHeadersConfig.forEach(config => {
+                const th = document.createElement('th');
+                th.className = 'px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+                th.textContent = config.label;
+                if (config.sortable) {
+                    th.classList.add('sortable-header');
+                    th.dataset.sortKey = config.key; 
+                    th.dataset.isDate = config.isDate || false;
+                     if(config.customRender) th.dataset.customRender = 'true';
+                    th.addEventListener('click', () => handleSort(config.key));
+                     if (config.key === currentSortColumn) { 
+                        th.classList.add(currentSortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+                    }
+                }
+                headerRow.appendChild(th);
+            });
+        }
+        
+        function handleSort(sortKey) {
+            if (currentSortColumn === sortKey) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = sortKey;
+                currentSortDirection = 'asc';
+            }
+            applySorting();
+            renderTable(allEntries); 
+        }
+
+        function applySorting() {
+            const sortConfig = tableHeadersConfig.find(h => h.key === currentSortColumn);
+            const isDateSort = sortConfig && sortConfig.isDate;
+            const hasCustomRender = sortConfig && sortConfig.customRender;
+
+            allEntries.sort((a, b) => {
+                let valA = hasCustomRender ? sortConfig.customRender(a).text : a[currentSortColumn];
+                let valB = hasCustomRender ? sortConfig.customRender(b).text : b[currentSortColumn];
+
+                if (valA === null || valA === undefined || valA === 'N/A') valA = currentSortDirection === 'asc' ? Infinity : -Infinity;
+                if (valB === null || valB === undefined || valB === 'N/A') valB = currentSortDirection === 'asc' ? Infinity : -Infinity;
+                
+                if (isDateSort) {
+                    const parseCustomDate = (dateStr) => {
+                        if (!dateStr || typeof dateStr !== 'string' || dateStr === 'N/A') return null;
+                        const parts = dateStr.match(/(\d{2})-([A-Za-z]{3})-(\d{4}) (\d{2}):(\d{2}):(\d{2}) (AM|PM)/);
+                        if (!parts) return new Date(dateStr); 
+                        const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+                        let hours = parseInt(parts[4], 10);
+                        if (parts[7] === 'PM' && hours < 12) hours += 12;
+                        if (parts[7] === 'AM' && hours === 12) hours = 0; 
+                        return new Date(parts[3], months[parts[2]], parts[1], hours, parts[5], parts[6]);
+                    };
+                    valA = parseCustomDate(valA);
+                    valB = parseCustomDate(valB);
+                    if (valA === null) valA = currentSortDirection === 'asc' ? Infinity : -Infinity;
+                    if (valB === null) valB = currentSortDirection === 'asc' ? Infinity : -Infinity;
+                } else if (typeof valA === 'string' && typeof valB === 'string') {
+                    valA = valA.toLowerCase();
+                    valB = valB.toLowerCase();
+                } else if (!isNaN(parseFloat(valA)) && !isNaN(parseFloat(valB))) {
+                    valA = parseFloat(valA);
+                    valB = parseFloat(valB);
+                }
+
+                if (valA < valB) return currentSortDirection === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            entriesTableHead.querySelectorAll('.sortable-header').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.dataset.sortKey === currentSortColumn) {
+                    th.classList.add(currentSortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+                }
+            });
+        }
+
+
+        // --- EVENT LISTENERS & INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeTableHeaders(); 
+            fetchEntries(); 
+            
+            openEntryFormModalButton.addEventListener('click', () => {
+                window.open(GOOGLE_FORM_URL, '_blank'); 
+            });
+            closeEntryFormModalButton.addEventListener('click', () => closeModal(addEntrySectionModal)); 
+            
+            openDoerInfoModalButton.addEventListener('click', openDoerModal);
+            closeDoerInfoModalButton.addEventListener('click', () => closeModal(doerInfoModal));
+            if(okDoerInfoModalButton) okDoerInfoModalButton.addEventListener('click', () => closeModal(doerInfoModal));
+
+            // Add Backend Data button event
+            const openBackendDataButton = document.getElementById('openBackendDataButton');
+            if (openBackendDataButton) {
+                openBackendDataButton.addEventListener('click', () => {
+                    window.open('https://docs.google.com/spreadsheets/d/18mEHFdmuXYzgCZYKP_2Fr-6zr8R2XqpxWgLouX5Rc5c/edit?gid=1061979610#gid=1061979610', '_blank');
+                });
+            }
+
+            openHowToUseModalButton.addEventListener('click', openHowToUse); 
+            closeHowToUseModalButton.addEventListener('click', () => closeModal(howToUseModal)); 
+            okHowToUseModalButton.addEventListener('click', () => closeModal(howToUseModal)); 
+            
+            modalCancelButton.onclick = closeAlertModal; 
+
+             // Dashboard Header JS
+            updateDateTime();
+            setInterval(updateDateTime, 1000); 
+
+            const syncButton = document.getElementById('syncButton');
+            if (syncButton) {
+                syncButton.addEventListener('click', () => {
+                    const svgIcon = syncButton.querySelector('svg');
+                    if (svgIcon) {
+                        svgIcon.classList.add('rotate-animate');
+                        console.log("Syncing data via dashboard header button...");
+                        fetchEntries(); 
+                        setTimeout(() => {
+                            svgIcon.classList.remove('rotate-animate');
+                            console.log("Sync complete.");
+                        }, 1000); 
+                    }
+                });
+            }
+        });
+
+        searchInput.addEventListener('input', () => { currentPage = 1; applySorting(); renderTable(allEntries); });
+
+        // --- Function to determine current status based on S1/S2 fields ---
+        function determineEntryStatus(entry) {
+            if (String(entry['Approve/Reject (S2)']).trim().toLowerCase() === 'approved') return STATUS_MAP.S2_APPROVED;
+            if (String(entry['Approve/Reject (S2)']).trim().toLowerCase() === 'rejected') return STATUS_MAP.S2_REJECTED;
+            if (entry['Actual (S2)']) return STATUS_MAP.S2_ACTION_TAKEN; 
+            if (entry['Actual (S1)']) return STATUS_MAP.S1_COMPLETE; 
+            return STATUS_MAP.S1_PENDING; 
+        }
+
+
+        async function processGenericStep(entryId, buttonElement, stepConfigKey, newStatus, additionalData = {}) {
+            if(buttonElement) setButtonLoading(true, buttonElement, null); 
+            const entryIdx = allEntries.findIndex(e => e.UID === entryId); 
+            if (entryIdx === -1) {
+                showUserAlert('Error: Entry not found for update.', 'error');
+                if(buttonElement) setButtonLoading(false, buttonElement, null);
+                return;
+            }
+
+            const now = new Date();
+            const entryToUpdateLocally = { ...allEntries[entryIdx] }; 
+            const stepDetails = STEP_ACTION_CONFIG[stepConfigKey] || {};
+
+            const dataToUpdatePayload = {
+                ...additionalData 
+            };
+
+            if (stepDetails.actualKey) {
+                dataToUpdatePayload[stepDetails.actualKey] = formatDateForDisplay(now);
+            }
+            if (stepDetails.plannedKey && entryToUpdateLocally[stepDetails.plannedKey] && entryToUpdateLocally[stepDetails.plannedKey] !== "SKIPPED" && entryToUpdateLocally[stepDetails.plannedKey] !== "N/A") {
+                 const plannedDate = new Date(entryToUpdateLocally[stepDetails.plannedKey].replace(/-/g, " ").replace(" AM", "").replace(" PM", ""));
+                 if (!isNaN(plannedDate.getTime())) {
+                    dataToUpdatePayload[stepDetails.timeDelayKey] = calculateTimeDelay(now, plannedDate).replace(/<[^>]*>?/gm, '');
+                 } else {
+                    dataToUpdatePayload[stepDetails.timeDelayKey] = "N/A";
+                 }
+            } else if (stepDetails.timeDelayKey) { 
+                 dataToUpdatePayload[stepDetails.timeDelayKey] = "N/A";
+            }
+
+             if (stepDetails.commentsKey && additionalData[stepDetails.commentsKey] !== undefined) {
+                dataToUpdatePayload[stepDetails.commentsKey] = additionalData[stepDetails.commentsKey];
+            }
+
+
+            if (stepConfigKey === 's1Action' && STEP_ACTION_CONFIG.s2Action.plannedKey) {
+                dataToUpdatePayload[STEP_ACTION_CONFIG.s2Action.plannedKey] = formatDateForDisplay(addDays(now, 2)); 
+            }
+            
+            if (stepConfigKey === 's2Approve') {
+                dataToUpdatePayload['Approve/Reject (S2)'] = 'Approved';
+            } else if (stepConfigKey === 's2Reject') {
+                dataToUpdatePayload['Approve/Reject (S2)'] = 'Rejected';
+            }
+
+
+            try {
+                const updateUrl = `${MODIFY_ENTRIES_URL}/UID/${entryToUpdateLocally.UID}`; 
+                const res = await fetch(updateUrl, {
+                    method: 'PUT', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: dataToUpdatePayload }) 
+                });
+                if (res.ok) {
+                    showUserAlert(`Entry ${entryToUpdateLocally.UID} updated to "${newStatus}"!`, 'success');
+                    
+                    Object.assign(allEntries[entryIdx], dataToUpdatePayload); 
+                    allEntries[entryIdx].status = newStatus; 
+
+                    applySorting(); renderTable(allEntries);
+                    if (entryDetailsModal.style.display === "block") {
+                         const currentModalEntry = allEntries.find(e => e.UID === entryId);
+                         if(currentModalEntry) populateDetailsModal(currentModalEntry);
+                    }
+                } else {
+                    const errorResult = await res.json().catch(() => ({ message: 'Unknown error' }));
+                    showUserAlert('Error updating status: ' + (errorResult.error || errorResult.message || res.statusText), 'error');
+                }
+            } catch (e) {
+                console.error('Error updating status:', e);
+                showUserAlert('Network error: ' + e.message, 'error');
+            } finally {
+                if(buttonElement) setButtonLoading(false, buttonElement, null);
+            }
+        }
+        
+        // --- ENTRY DETAILS MODAL ---
+        function populateDetailsModal(entry) {
+            detailsModalContent.innerHTML = ''; 
+            
+            const modalContentSection = entryDetailsModal.querySelector('.modal-content');
+
+            const existingControlsGroup = modalContentSection.querySelector('.modal-controls-group');
+            if (existingControlsGroup) existingControlsGroup.remove();
+
+            const controlsGroup = document.createElement('div');
+            controlsGroup.className = 'modal-controls-group';
+
+            const newCloseButton = document.createElement('button');
+            newCloseButton.className = 'modal-control-button close-btn';
+            newCloseButton.title = 'Close';
+            newCloseButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/></svg>`;
+            newCloseButton.onclick = () => closeModal(entryDetailsModal);
+            controlsGroup.appendChild(newCloseButton);
+            
+            if (modalContentSection) {
+                 modalContentSection.insertBefore(controlsGroup, modalContentSection.firstChild);
+            }
+
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'crm-card'; 
+
+            const overviewTitle = document.createElement('h2');
+            overviewTitle.textContent = 'Entry Overview';
+            cardDiv.appendChild(overviewTitle);
+
+            const createSectionItem = (label, value, isHtml = false) => {
+                const item = document.createElement('div'); item.className = 'crm-description-item';
+                const lbl = document.createElement('div'); lbl.className = 'crm-label'; lbl.textContent = label + ':';
+                const val = document.createElement('div'); val.className = 'crm-value';
+                if (isHtml) {
+                    val.innerHTML = value || '<span class="text-gray-400">N/A</span>';
+                } else {
+                    val.textContent = value || 'N/A';
+                }
+                item.append(lbl, val);
+                return item;
+            };
+            
+            const mainDetailsSection = document.createElement('div'); 
+            mainDetailsSection.className = 'crm-section';
+            mainDetailsSection.style.cssText = '--section-color: #3f51b5; --section-bg: rgba(63, 81, 181, 0.07);';
+            mainDetailsSection.innerHTML = `<div class="crm-section-header"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25M15 19.5V18a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 18v1.5M15 19.5h-6M16.5 10.5H18c.828 0 1.5.672 1.5 1.5v5.25c0 .828-.672 1.5-1.5 1.5H15v-6.75zM9.75 10.5H18M9.75 10.5V18m0-7.5H5.25M5.25 10.5V18" /></svg><span>Main Details</span></div><div class="crm-section-content grid grid-cols-1 md:grid-cols-2 gap-x-4"></div>`;
+            const mainContent = mainDetailsSection.querySelector('.crm-section-content');
+
+            mainContent.appendChild(createSectionItem('UID', entry.UID || entry.uid));
+            mainContent.appendChild(createSectionItem('Timestamp', formatDateForDisplay(entry.Timestamp)));
+            mainContent.appendChild(createSectionItem('Party Name', entry['Party Name']));
+            mainContent.appendChild(createSectionItem('Payment Amounts', entry['Payment Amounts'] ? `₹${parseFloat(entry['Payment Amounts']).toFixed(2)}` : 'N/A'));
+            mainContent.appendChild(createSectionItem('Mobile Number', entry['Mobile Number']));
+            mainContent.appendChild(createSectionItem('Comments (Initial)', entry.Comments));
+            mainContent.appendChild(createSectionItem('Current Status', entry.status || determineEntryStatus(entry)));
+            
+            cardDiv.appendChild(mainDetailsSection);
+            
+            // S1 and S2 Details Section
+            const s1s2DetailsSection = document.createElement('div');
+            s1s2DetailsSection.className = 'details-section mt-6';
+            const s1s2Title = document.createElement('h3');
+            s1s2Title.textContent = 'Stage Processing';
+            s1s2DetailsSection.appendChild(s1s2Title);
+
+            const currentAppStatus = entry.status || determineEntryStatus(entry);
+
+            // S1 Section
+            const s1Div = document.createElement('div'); s1Div.className = 'timeline-step';
+            s1Div.innerHTML = `<strong>${STEP_NAMES.s1Action}</strong>
+                               <div class="timeline-details-grid mt-2">
+                                 ${createSectionItem('Planned', formatDateForDisplay(entry['Planned (S1)'])).outerHTML}
+                                 ${createSectionItem('Actual', formatDateForDisplay(entry['Actual (S1)'])).outerHTML}
+                                 ${createSectionItem('Time Delay', calculateTimeDelay(entry['Actual (S1)'], entry['Planned (S1)']), true).outerHTML}
+                               </div>`;
+            if (currentAppStatus === STATUS_MAP.S1_PENDING) {
+                const s1Button = document.createElement('button');
+                const s1ActionURL = entry['Take Action (S1)'];
+
+                if (s1ActionURL && (s1ActionURL.startsWith('http://') || s1ActionURL.startsWith('https://'))) {
+                    s1Button.textContent = "Take Action"; 
+                    s1Button.className = 'btn btn-info btn-take-action';
+                    s1Button.onclick = () => {
+                        window.open(s1ActionURL, '_blank');
+                    };
+                } else {
+                    s1Button.textContent = "Take Action"; 
+                    s1Button.className = 'btn btn-success btn-take-action';
+                    s1Button.onclick = () => {
+                        showUserAlert('Confirm S1 Action completed?', 'confirm', () => {
+                            processGenericStep(entry.UID, s1Button, 's1Action', STATUS_MAP.S1_COMPLETE, { 
+                                'Take Action (S1)': 'Done Internally' 
+                            });
+                        });
+                    };
+                }
+                s1Div.appendChild(s1Button);
+            }
+            s1s2DetailsSection.appendChild(s1Div);
+
+            // S2 Section
+            if (currentAppStatus !== STATUS_MAP.S1_PENDING) { 
+                const s2Div = document.createElement('div'); s2Div.className = 'timeline-step';
+                s2Div.innerHTML = `<strong>${STEP_NAMES.s2Action}</strong>
+                                   <div class="timeline-details-grid mt-2">
+                                     ${createSectionItem('Planned', formatDateForDisplay(entry['Planned (S2)'])).outerHTML}
+                                     ${createSectionItem('Actual', formatDateForDisplay(entry['Actual (S2)'])).outerHTML}
+                                     ${createSectionItem('Time Delay', calculateTimeDelay(entry['Actual (S2)'], entry['Planned (S2)']), true).outerHTML}
+                                     ${createSectionItem('Comments', entry['Comments (S2)']).outerHTML}
+                                     ${createSectionItem('Approval', entry['Approve/Reject (S2)']).outerHTML}
+                                   </div>`;
+                
+                if (currentAppStatus === STATUS_MAP.S1_COMPLETE) {
+                    const s2TakeActionButton = document.createElement('button');
+                    const s2ActionURL = entry['Take Action (S2)'];
+
+                    if (s2ActionURL && (s2ActionURL.startsWith('http://') || s2ActionURL.startsWith('https://'))) {
+                        s2TakeActionButton.textContent = "Take Action"; 
+                        s2TakeActionButton.className = 'btn btn-info btn-take-action';
+                        s2TakeActionButton.onclick = () => {
+                            window.open(s2ActionURL, '_blank');
+                        };
+                    } else {
+                        s2TakeActionButton.textContent = "Take Action"; 
+                        s2TakeActionButton.className = 'btn btn-info btn-take-action';
+                        s2TakeActionButton.onclick = () => {
+                            showUserAlert('Confirm S2 Action completed?', 'confirm', () => {
+                                 const s2Comments = prompt("Enter S2 Comments (optional):", entry['Comments (S2)'] || "");
+                                processGenericStep(entry.UID, s2TakeActionButton, 's2Action', STATUS_MAP.S2_ACTION_TAKEN, { 
+                                    'Take Action (S2)': 'Done Internally',
+                                    'Comments (S2)': s2Comments !== null ? s2Comments : (entry['Comments (S2)'] || '')
+                                });
+                            });
+                        };
+                    }
+                    s2Div.appendChild(s2TakeActionButton);
+
+                } else if (currentAppStatus === STATUS_MAP.S2_ACTION_TAKEN) {
+                    const approveButton = document.createElement('button');
+                    approveButton.textContent = "Take Action"; // Generic "Take Action"
+                    approveButton.className = 'btn btn-success btn-take-action mr-2'; // Kept success for approve
+                    approveButton.onclick = () => {
+                         showUserAlert('Approve S2?', 'confirm', () => {
+                            processGenericStep(entry.UID, approveButton, 's2Approve', STATUS_MAP.S2_APPROVED, {'Approve/Reject (S2)': 'Approved'}); 
+                        });
+                    };
+
+                    const rejectButton = document.createElement('button');
+                    rejectButton.textContent = "Take Action"; // Generic "Take Action"
+                    rejectButton.className = 'btn btn-danger btn-take-action'; // Kept danger for reject
+                    rejectButton.onclick = () => {
+                        showUserAlert('Reject S2?', 'confirm', () => {
+                            processGenericStep(entry.UID, rejectButton, 's2Reject', STATUS_MAP.S2_REJECTED, {'Approve/Reject (S2)': 'Rejected'}); 
+                        });
+                    };
+                    s2Div.appendChild(approveButton);
+                    s2Div.appendChild(rejectButton);
+                }
+                s1s2DetailsSection.appendChild(s2Div);
+            }
+            
+            cardDiv.appendChild(s1s2DetailsSection);
+            detailsModalContent.appendChild(cardDiv);
+        }
+        
+        
+        async function fetchEntries() {
+            tableStatus.textContent = 'Loading entries...'; 
+            tableStatus.classList.remove('hidden');
+            entriesTableBody.innerHTML = ''; 
+            paginationControls.innerHTML = '';
+            const entranceOverlay = document.getElementById('entranceAnimationOverlay');
+
+
+            if (VIEW_ENTRIES_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE') { 
+                console.warn("VIEW_ENTRIES_URL is still the placeholder. Using local demo data for fetchEntries.");
+                 if (allEntries.length === 0) { 
+                    const now = new Date(); const step1Time = new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000); 
+                    allEntries = [ 
+                        { 
+                            id: 'demo1', UID: 'UID01', Timestamp: formatDateForInput(step1Time), 
+                            'Party Name': 'Alpha Services (Demo)', 'Payment Amounts': "50000", 
+                            'Mobile Number':"9998887770", 'Comments': "Initial Demo Comment",
+                            status: STATUS_MAP.S1_PENDING, 
+                            'Planned (S1)': formatDateForDisplay(addDays(step1Time, 2)),
+                            'Actual (S1)': null, 'Time Delay (S1)': null, 'Take Action (S1)': '',
+                            'Planned (S2)': null, 'Actual (S2)': null, 'Time Delay (S2)': null, 
+                            'Approve/Reject (S2)': '', 'Comments (S2)': '', 'Take Action (S2)': ''
+                        }
+                    ];
+                }
+                allEntries.forEach(entry => entry.status = determineEntryStatus(entry)); 
+                applySorting(); 
+                renderTable(allEntries); 
+                tableStatus.classList.toggle('hidden', allEntries.length > 0);
+                if (allEntries.length === 0) tableStatus.textContent = 'No entries (demo).'; 
+                if(entranceOverlay) entranceOverlay.classList.add('hidden'); 
+                return;
+            }
+            try {
+                const res = await fetch(`${VIEW_ENTRIES_URL}?action=getEntries`); 
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    throw new Error(`Failed to fetch: ${res.status} ${res.statusText} - ${errorText}`);
+                }
+                const result = await res.json();
+                console.log('Raw response from Apps Script:', result); 
+
+                let dataToProcess = [];
+                if (result && result.success && Array.isArray(result.data)) { 
+                    dataToProcess = result.data;
+                } else if (Array.isArray(result)) { 
+                     console.warn("Apps Script returned a direct array. Expected {success: true, data: [...]}. Adapting...");
+                    dataToProcess = result;
+                } else {
+                    tableStatus.textContent = 'Error fetching entries: '+(result.message ||'Invalid data format received from script.'); 
+                    showUserAlert('Error fetching entries: '+(result.message ||'Invalid data format received from script.'),'error'); 
+                    if(entranceOverlay) entranceOverlay.classList.add('hidden');
+                    return; 
+                }
+                
+                allEntries = dataToProcess.map(e=>({...e, 
+                    status: determineEntryStatus(e) 
+                })).sort((a,b) => { 
+                    let valA = a.UID || a.Timestamp;
+                    let valB = b.UID || b.Timestamp;
+                    if (currentSortColumn === 'Timestamp' && a.Timestamp && b.Timestamp) {
+                         try { valA = new Date(a.Timestamp.replace(/-/g, " ").replace(" AM", "").replace(" PM", "")); } catch { valA = 0; }
+                         try { valB = new Date(b.Timestamp.replace(/-/g, " ").replace(" AM", "").replace(" PM", "")); } catch { valB = 0; }
+                    }
+                    if (valA < valB) return currentSortDirection === 'asc' ? -1 : 1;
+                    if (valA > valB) return currentSortDirection === 'asc' ? 1 : -1;
+                    return 0;
+                }); 
+                currentPage = 1; 
+                applySorting(); 
+                renderTable(allEntries); 
+                tableStatus.classList.toggle('hidden', allEntries.length > 0);
+                if (allEntries.length === 0) tableStatus.textContent = 'No entries found.';
+                
+            } catch (e) { 
+                console.error('Error fetching entries:', e); 
+                tableStatus.textContent = 'Failed to load entries. Check console and SCRIPT_URL.'; 
+                showUserAlert('Network error while fetching entries: '+e.message,'error'); 
+            } finally {
+                if(entranceOverlay) entranceAnimationOverlay.classList.add('hidden'); 
+            }
+        }
+        function renderTable(entries) { 
+            entriesTableBody.innerHTML = ''; paginationControls.innerHTML = ''; 
+            const searchTerm = searchInput.value.toLowerCase();
+            const filtered = entries.filter(e => 
+                Object.values(e).some(val => String(val).toLowerCase().includes(searchTerm))
+            );
+            
+            renderScorecards(allEntries); 
+
+            tableStatus.classList.toggle('hidden', filtered.length > 0);
+             if (filtered.length === 0) {
+                if (entries.length > 0 && searchTerm) {
+                    tableStatus.textContent = 'No entries match your search.';
+                } else if (entries.length === 0 && VIEW_ENTRIES_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE') { 
+                     tableStatus.textContent = 'No entries found.';
+                } else if (entries.length === 0) {
+                    tableStatus.textContent = 'No entries (demo mode).';
+                }
+            }
+
+            const paginated = filtered.slice((currentPage-1)*ITEMS_PER_PAGE, (currentPage-1)*ITEMS_PER_PAGE + ITEMS_PER_PAGE);
+            
+            paginated.forEach((entry, idx) => {
+                const r = entriesTableBody.insertRow(); r.className = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'; 
+                tableHeadersConfig.forEach(hConfig => {
+                    if (hConfig.key === 'actions') return; 
+                    const c = r.insertCell(); 
+                    let cellValue;
+                    let cellHtml = '';
+                    let isOverdue = false;
+
+                    if (hConfig.customRender) { // For 'nextPlannedActionOn'
+                        const renderResult = hConfig.customRender(entry);
+                        cellValue = renderResult.text || 'N/A';
+                        isOverdue = renderResult.isOverdue || false;
+                    } else if (hConfig.key === 'status') {
+                        cellValue = entry.status || determineEntryStatus(entry); 
+                    } else {
+                        cellValue = entry[hConfig.key]; 
+                        cellValue = (hConfig.isDate && cellValue) ? formatDateForDisplay(cellValue) : (cellValue || 'N/A');
+                    }
+                    
+                    if (hConfig.key === 'status') {
+                        let statusClass = 'status-default';
+                        if (cellValue === STATUS_MAP.S1_PENDING) statusClass = 'status-pending-s1-action';
+                        else if (cellValue === STATUS_MAP.S1_COMPLETE) statusClass = 'status-s1-done-awaiting-s2-action';
+                        else if (cellValue === STATUS_MAP.S2_ACTION_TAKEN) statusClass = 'status-s2-action-taken-awaiting-approval';
+                        else if (cellValue === STATUS_MAP.S2_APPROVED) statusClass = 'status-s2-approved';
+                        else if (cellValue === STATUS_MAP.S2_REJECTED) statusClass = 'status-s2-rejected';
+                        cellHtml = `<span class="status-badge ${statusClass}">${cellValue}</span>`;
+                    } else if (isOverdue) {
+                        cellHtml = `<span class="overdue-task">${cellValue}</span>`;
+                    }
+                     else {
+                        cellHtml = cellValue;
+                    }
+                    c.innerHTML = cellHtml; 
+                    c.setAttribute('data-label',hConfig.label); 
+                    c.className='px-3 py-4 whitespace-nowrap text-sm text-gray-700'; 
+                });
+                const actCell = r.insertCell(); actCell.setAttribute('data-label','Actions'); actCell.className='px-3 py-4 whitespace-nowrap text-sm text-gray-700 text-right md:text-left flex items-center space-x-1';
+                const viewButton = document.createElement('button');
+                viewButton.className = 'btn btn-info btn-sm text-xs p-1 btn-icon-only';
+                viewButton.title = 'View Details';
+                viewButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-eye-fill" viewBox="0 0 16 16"><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0"/><path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8m8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7"/></svg>`;
+                viewButton.onclick = () => openEntryDetailsModal(entry.UID); // Use UID
+                actCell.appendChild(viewButton);
+            });
+            renderPaginationControls(filtered.length);
+        }
+        
+        function getNextPlannedActionTimestamp(entry) { 
+            const currentStatus = entry.status || determineEntryStatus(entry);
+            let plannedTimestampStr = 'N/A';
+            let isOverdue = false;
+            const now = new Date();
+
+            if (currentStatus === STATUS_MAP.S1_PENDING && entry['Planned (S1)']) {
+                plannedTimestampStr = formatDateForDisplay(entry['Planned (S1)']);
+                const plannedDate = new Date(String(entry['Planned (S1)']).replace(/-/g, " ").replace(" AM", "").replace(" PM", ""));
+                if (!isNaN(plannedDate.getTime()) && plannedDate < now) isOverdue = true;
+            } else if (currentStatus === STATUS_MAP.S1_COMPLETE && entry['Planned (S2)']) {
+                plannedTimestampStr = formatDateForDisplay(entry['Planned (S2)']);
+                 const plannedDate = new Date(String(entry['Planned (S2)']).replace(/-/g, " ").replace(" AM", "").replace(" PM", ""));
+                if (!isNaN(plannedDate.getTime()) && plannedDate < now) isOverdue = true;
+            }
+            return { text: plannedTimestampStr, isOverdue: isOverdue };
+        }
+
+
+        function renderPaginationControls(total) {
+            paginationControls.innerHTML=''; const totalPages=Math.ceil(total/ITEMS_PER_PAGE); if(totalPages<=1)return;
+            const p=Object.assign(document.createElement('button'),{textContent:'Previous',className:'btn btn-secondary text-sm',disabled:currentPage===1,onclick:()=>{if(currentPage>1){currentPage--; applySorting(); renderTable(allEntries);}}});
+            const n=Object.assign(document.createElement('button'),{textContent:'Next',className:'btn btn-secondary text-sm',disabled:currentPage===totalPages,onclick:()=>{if(currentPage<totalPages){currentPage++; applySorting(); renderTable(allEntries);}}});
+            const i=Object.assign(document.createElement('span'),{textContent:`Page ${currentPage} of ${totalPages}`,className:'px-4 py-2 text-sm text-gray-700'});
+            paginationControls.append(p,i,n);
+        }
+        // function confirmDeleteEntry(id, identifier) { // Delete functionality removed
+        // }
+        // async function deleteEntry(id) { // Delete functionality removed
+        // }
+
+        // Dashboard Header JS
+        function updateDateTime() {
+            const dateTimeDisplay = document.getElementById('dateTimeDisplay');
+            if (dateTimeDisplay) {
+                const now = new Date();
+                const options = { 
+                    weekday: 'short', 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                };
+                dateTimeDisplay.textContent = now.toLocaleString('en-US', options);
+            }
+        }
+
+        const dashboardSyncButton = document.getElementById('syncButton'); 
+        if (dashboardSyncButton) {
+            dashboardSyncButton.addEventListener('click', () => {
+                const svgIcon = syncButton.querySelector('svg');
+                if (svgIcon) {
+                    svgIcon.classList.add('rotate-animate');
+                    console.log("Syncing data via dashboard header button...");
+                    fetchEntries(); 
+                    setTimeout(() => {
+                        svgIcon.classList.remove('rotate-animate');
+                        console.log("Sync complete.");
+                    }, 1000); 
+                }
+            });
+        }
+        
+    </script>
+</body>
+</html>
