@@ -7,7 +7,7 @@
 
 This dashboard is built using **HTML**, **Tailwind CSS**, and **JavaScript**, and integrates with:
 - **Google Forms** for entry submission
-- **Google Sheets** via **Apps Script** and **SheetDB API** for data retrieval and modifications
+- **Google Sheets** via **Apps Script** for data retrieval and modifications
 
 ---
 
